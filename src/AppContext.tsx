@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, getDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, getDoc, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export interface Punch {
   id: string;
@@ -16,6 +16,8 @@ interface AppContextType {
   logOut: () => Promise<void>;
   punches: Punch[];
   addPunch: () => Promise<void>;
+  updatePunch: (id: string, newTimestamp: Date) => Promise<void>;
+  deletePunch: (id: string) => Promise<void>;
   expectedMinutes: number;
   updateExpectedMinutes: (v: number) => Promise<void>;
   error: string | null;
@@ -154,9 +156,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const type = punches.length % 2 === 0 ? 'in' : 'out';
+      // Permite bater o ponto com o timestamp do cliente para consistência caso haja edição futura
       await addDoc(collection(db, `users/${user.uid}/punches`), {
         userId: user.uid,
-        timestamp: serverTimestamp(),
+        timestamp: new Date(),
         type
       });
     } catch (e: any) {
@@ -166,6 +169,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
          setError("Erro ao bater ponto de acesso: " + e.message);
       }
+    }
+  };
+
+  const updatePunch = async (id: string, newTimestamp: Date) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/punches`, id), {
+        timestamp: newTimestamp
+      });
+    } catch (e: any) {
+      console.error(e);
+      setError("Erro ao atualizar o ponto: " + e.message);
+    }
+  };
+
+  const deletePunch = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/punches`, id));
+    } catch (e: any) {
+      console.error(e);
+      setError("Erro ao deletar o ponto: " + e.message);
     }
   };
 
@@ -194,6 +219,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         logOut,
         punches, 
         addPunch, 
+        updatePunch,
+        deletePunch,
         expectedMinutes, 
         updateExpectedMinutes,
         error

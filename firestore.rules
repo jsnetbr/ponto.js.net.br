@@ -66,7 +66,7 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'timestamp', 'type'])
         && data.keys().size() == 3
         && data.userId == request.auth.uid
-        && data.timestamp == request.time
+        && data.timestamp is timestamp
         && data.type is string
         && data.type.size() <= 3
         && data.type in ['in', 'out'];
@@ -76,8 +76,13 @@ service cloud.firestore {
       allow get: if isOwner(userId) && isValidId(userId) && isValidId(punchId);
       allow list: if isOwner(userId) && isValidId(userId) && resource.data.userId == request.auth.uid; 
       allow create: if isOwner(userId) && isValidId(userId) && isValidId(punchId) && isValidPunchCreate(incoming());
-      allow update: if false; // Punches are immutable
-      allow delete: if false; // Punches are immutable
+      allow update: if (
+        isOwner(userId) && isValidId(userId) && isValidId(punchId) && 
+        isValidPunchCreate(incoming()) && 
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['timestamp', 'type'])
+      );
+      allow delete: if isOwner(userId) && isValidId(userId) && isValidId(punchId);
     }
 
   }

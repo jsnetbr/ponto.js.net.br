@@ -1,11 +1,14 @@
-import { Calendar as CalendarIcon, Filter, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, CheckCircle2, AlertCircle, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
 import { formatMinutes, calculateWorkedMs } from '../utils';
 
 export function History() {
-  const { punches, expectedMinutes } = useAppContext();
+  const { punches, expectedMinutes, updatePunch, deletePunch } = useAppContext();
   const [now, setNow] = useState(new Date());
+  
+  const [editingPunch, setEditingPunch] = useState<{ id: string, dateObj: Date, timeStr: string } | null>(null);
+  const [editTime, setEditTime] = useState('');
 
   useEffect(() => {
     // Atualiza a cada 1 minuto para o estado "trabalhando" renderizar corretamente os totais
@@ -62,9 +65,13 @@ export function History() {
     
     for(let j = 0; j < padTo; j++) {
       if (dayPunches[j]) {
-        uiPunches.push(dayPunches[j].timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+        uiPunches.push({
+          id: dayPunches[j].id,
+          dateObj: dayPunches[j].timestamp,
+          displayStr: dayPunches[j].timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        });
       } else {
-        uiPunches.push('--:--');
+        uiPunches.push({ id: null, dateObj: null, displayStr: '--:--' });
       }
     }
 
@@ -78,6 +85,31 @@ export function History() {
 
   const monthName = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const currentMonthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+  const handleOpenEdit = (punch: { id: string, dateObj: Date, displayStr: string }) => {
+    setEditingPunch({ id: punch.id, dateObj: punch.dateObj, timeStr: punch.displayStr });
+    setEditTime(punch.displayStr);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPunch || !editTime) return;
+    const [hh, mm] = editTime.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm)) return;
+    
+    const targetDate = new Date(editingPunch.dateObj);
+    targetDate.setHours(hh, mm, 0, 0);
+    
+    await updatePunch(editingPunch.id, targetDate);
+    setEditingPunch(null);
+  };
+
+  const handleDelete = async () => {
+    if (!editingPunch) return;
+    if (window.confirm("Certeza que deseja excluir este ponto? Essa ação não pode ser desfeita.")) {
+      await deletePunch(editingPunch.id);
+      setEditingPunch(null);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-12 pb-32 md:pt-32 relative z-10 w-full">
@@ -116,7 +148,7 @@ export function History() {
                   {day.status === 'complete' && <CheckCircle2 className="text-emerald-500 w-5 h-5" title="Jornada Completa" />}
                   {day.status === 'incomplete' && <AlertCircle className="text-amber-500 w-5 h-5" title="Jornada Incompleta" />}
                   {day.status === 'working' && <div className="w-3 h-3 rounded-full bg-primary animate-pulse ml-1 mr-1" title="Em andamento"></div>}
-                  <span className="text-label-sm text-outline-variant tracking-wider font-bold">{day.date}</span>
+                  <span className="text-label-sm text-on-surface-variant tracking-wider font-bold">{day.date}</span>
                 </div>
                 <span className={`text-headline-md font-extrabold tabular-nums flex items-baseline gap-1 ${day.status === 'incomplete' ? 'text-amber-600' : 'text-on-surface'}`}>
                   {day.total}
@@ -131,12 +163,15 @@ export function History() {
 
                   return (
                     <div key={j} className="flex flex-col items-center">
-                      <span className="text-[10px] uppercase text-outline font-bold mb-1">
+                      <span className="text-[10px] uppercase text-on-surface-variant opacity-80 font-bold mb-1">
                         {label}
                       </span>
-                      <div className={`w-full py-2 flex justify-center rounded-lg ${p === '--:--' ? 'bg-surface border border-dashed border-outline-variant text-outline' : 'bg-surface-variant text-on-surface'}`}>
-                        <span className="text-body-md font-semibold tabular-nums">{p}</span>
-                      </div>
+                      <button 
+                        onClick={() => p.id && p.dateObj && handleOpenEdit({ id: p.id, dateObj: p.dateObj, displayStr: p.displayStr })}
+                        className={`w-full py-2 flex justify-center rounded-lg transition-colors ${p.id ? 'hover:bg-primary/20 hover:text-primary cursor-pointer' : ''} ${p.displayStr === '--:--' ? 'bg-surface border border-dashed border-outline-variant text-on-surface-variant opacity-60 cursor-default' : 'bg-surface-variant text-on-surface'}`}
+                      >
+                        <span className="text-body-md font-semibold tabular-nums">{p.displayStr}</span>
+                      </button>
                     </div>
                   );
                 })}
@@ -148,6 +183,44 @@ export function History() {
             <button className="glass-panel border border-outline hover:border-primary/50 text-on-surface-variant text-label-sm px-6 py-2.5 rounded-full hover:bg-surface-variant transition-colors shadow-sm">
               VER ANTERIORES
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingPunch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="glass-panel w-full max-w-sm rounded-2xl p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
+             <button 
+               onClick={() => setEditingPunch(null)}
+               className="absolute top-4 right-4 text-outline hover:text-on-surface transition-colors"
+             >
+               <X size={20} />
+             </button>
+             
+             <h3 className="text-headline-sm font-bold text-on-surface mb-6">Editar Registro</h3>
+             <label className="block text-label-sm font-bold text-outline-variant mb-2 pl-1">HORÁRIO</label>
+             <input 
+               type="time" 
+               value={editTime}
+               onChange={(e) => setEditTime(e.target.value)}
+               className="w-full bg-surface-variant/50 border border-outline-variant text-on-surface text-headline-md font-semibold rounded-xl h-16 px-4 mb-8 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-center file:hidden"
+             />
+
+             <div className="flex justify-between items-center gap-3">
+                <button 
+                  onClick={handleDelete}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-error-container text-error rounded-xl hover:bg-error/20 transition-colors font-semibold"
+                >
+                  <Trash2 size={20} />
+                </button>
+                <button 
+                  onClick={handleSaveEdit}
+                  className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+                >
+                  SALVAR
+                </button>
+             </div>
           </div>
         </div>
       )}
