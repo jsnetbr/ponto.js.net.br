@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { History } from './components/History';
@@ -64,15 +65,24 @@ function AppContent() {
       <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <main className="flex-1 w-full h-full overflow-y-auto no-scrollbar relative z-10 md:pt-20">
-        <div className="w-full min-h-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 md:pb-0">
-          {error && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-error text-white px-6 py-3 rounded-full shadow-lg text-sm font-bold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-              {error}
-            </div>
-          )}
-          {renderContent()}
-        </div>
+        {error && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-error text-white px-6 py-3 rounded-full shadow-lg text-sm font-bold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+            {error}
+          </div>
+        )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="pb-24 md:pb-0"
+          >
+            {renderContent()}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

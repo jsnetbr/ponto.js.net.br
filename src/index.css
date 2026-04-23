@@ -3,31 +3,31 @@
 @theme {
   --font-sans: "Helvetica Neue", Arial, sans-serif;
 
-  --color-primary: #0F172A;
-  --color-secondary: #64748B;
-  --color-tertiary: #94A3B8;
-  --color-primary-container: #1E293B;
-  --color-secondary-container: #E2E8F0;
-  --color-tertiary-container: #F1F5F9;
+  --color-primary: #818CF8;
+  --color-secondary: #94A3B8;
+  --color-tertiary: #475569;
+  --color-primary-container: #312E81;
+  --color-secondary-container: #334155;
+  --color-tertiary-container: #1E293B;
   
-  --color-surface: #FFFFFF;
-  --color-surface-dim: #F8FAFC;
-  --color-surface-bright: #FFFFFF;
-  --color-surface-container-lowest: #FFFFFF;
-  --color-surface-container-low: #F8FAFC;
-  --color-surface-container: #F1F5F9;
-  --color-surface-container-high: #E2E8F0;
-  --color-surface-container-highest: #CBD5E1;
-  --color-surface-variant: #F1F5F9;
+  --color-surface: #0F172A;
+  --color-surface-dim: #020617;
+  --color-surface-bright: #1E293B;
+  --color-surface-container-lowest: #020617;
+  --color-surface-container-low: #0F172A;
+  --color-surface-container: #1E293B;
+  --color-surface-container-high: #334155;
+  --color-surface-container-highest: #475569;
+  --color-surface-variant: #1E293B;
   
-  --color-on-surface: #1E293B;
-  --color-on-surface-variant: #64748B;
-  --color-outline: #E2E8F0;
-  --color-outline-variant: #F1F5F9;
+  --color-on-surface: #F8FAFC;
+  --color-on-surface-variant: #94A3B8;
+  --color-outline: #475569;
+  --color-outline-variant: #334155;
   
-  --color-error: #EF4444;
-  --color-error-container: #FEE2E2;
-  --color-on-error: #FFFFFF;
+  --color-error: #F87171;
+  --color-error-container: #450A0A;
+  --color-on-error: #FEE2E2;
 }
 
 @layer utilities {
@@ -65,20 +65,26 @@
   }
 
   .glass-panel {
-    background-color: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    background-color: rgba(30, 41, 59, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    color: #F8FAFC;
   }
 
   .glass-panel-elevated {
-    background-color: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+    background-color: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
+    color: #F8FAFC;
   }
 
   .app-bg {
-    background-color: #F8FAFC;
-    background-image: radial-gradient(circle at 100% 0%, #E0F2FE 0%, transparent 50%);
+    background-color: #0F172A;
+    background-image: radial-gradient(circle at 100% 0%, #1E293B 0%, #0F172A 50%);
     background-attachment: fixed;
   }
 

@@ -1,34 +1,23 @@
-import { Clock, Database, Download, LogOut, MapPin, Building } from 'lucide-react';
+import { Clock, Database, Download, LogOut, Building } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
 
 export function Settings() {
   const { expectedMinutes, updateExpectedMinutes, logOut, user } = useAppContext();
-  const [requireLocation, setRequireLocation] = useState(true);
 
-  // Derive initial values for UI
-  const currentHours = Math.floor(expectedMinutes / 60);
-  const currentMins = expectedMinutes % 60;
+  // Local state for lazy update
+  const [localHours, setLocalHours] = useState(Math.floor(expectedMinutes / 60));
+  const [localMins, setLocalMins] = useState(expectedMinutes % 60);
 
-  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let h = parseInt(e.target.value) || 0;
-    if (h < 0) h = 0;
-    if (h > 24) h = 24;
-    updateExpectedMinutes((h * 60) + currentMins);
-  };
-
-  const handleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let m = parseInt(e.target.value) || 0;
-    if (m < 0) m = 0;
-    if (m > 59) m = 59;
-    updateExpectedMinutes((currentHours * 60) + m);
+  const handleSave = () => {
+    updateExpectedMinutes((localHours * 60) + localMins);
   };
 
   return (
     <div className="pt-12 md:pt-32 pb-32 px-6 max-w-3xl mx-auto flex flex-col gap-8 relative z-10 w-full mb-32">
       <div className="mb-4">
         <h2 className="text-display-lg text-on-surface">Ajustes</h2>
-        <p className="text-body-md text-on-surface-variant mt-2">Configure sua jornada de trabalho e restrições de ponto.</p>
+        <p className="text-body-md text-on-surface-variant mt-2">Configure sua jornada de trabalho.</p>
       </div>
 
       <section className="glass-panel rounded-xl overflow-hidden flex flex-col">
@@ -62,15 +51,16 @@ export function Settings() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <label className="text-label-sm text-on-surface block mb-1">JORNADA DIÁRIA PREVISTA</label>
-              <span className="text-body-md text-on-surface-variant text-sm">Ex.: 8h48m</span>
+              <span className="text-body-md text-on-surface-variant text-sm">Defina quanto tempo você deve trabalhar por dia.</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative w-24">
                 <input 
                   type="number" 
                   min="0" max="24"
-                  value={currentHours} 
-                  onChange={handleHoursChange}
+                  value={localHours} 
+                  onChange={(e) => setLocalHours(parseInt(e.target.value) || 0)}
+                  onBlur={handleSave}
                   className="w-full bg-surface-variant border border-outline-variant rounded-lg px-3 py-2 pr-6 text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-center" 
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-label-sm">h</span>
@@ -80,8 +70,9 @@ export function Settings() {
                 <input 
                   type="number" 
                   min="0" max="59"
-                  value={currentMins === 0 ? '00' : currentMins} 
-                  onChange={handleMinutesChange}
+                  value={localMins.toString().padStart(2, '0')} 
+                  onChange={(e) => setLocalMins(parseInt(e.target.value) || 0)}
+                  onBlur={handleSave}
                   className="w-full bg-surface-variant border border-outline-variant rounded-lg px-3 py-2 pr-7 text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-center" 
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-label-sm">m</span>
@@ -93,51 +84,8 @@ export function Settings() {
           
           <div className="flex flex-col gap-3">
             <div>
-              <label className="text-label-sm text-on-surface block mb-1">DIAS ÚTEIS DE TRABALHO</label>
-              <span className="text-body-md text-on-surface-variant text-sm">Dias mapeados para o mês</span>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {['SEG', 'TER', 'QUA', 'QUI', 'SEX'].map(day => (
-                <button key={day} className="bg-primary/5 text-primary border border-primary/20 px-4 py-1.5 rounded-full text-label-sm hover:bg-primary/10 transition-colors">
-                  {day}
-                </button>
-              ))}
-              {['SÁB', 'DOM'].map(day => (
-                <button key={day} className="bg-surface-variant text-on-surface-variant border border-outline-variant px-4 py-1.5 rounded-full text-label-sm hover:bg-outline-variant/60 transition-colors">
-                  {day}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="glass-panel rounded-xl overflow-hidden flex flex-col">
-        <div className="px-6 py-5 border-b border-outline-variant bg-surface-variant/30">
-          <h3 className="text-headline-md text-on-surface flex items-center gap-2">
-            <Building className="text-primary w-6 h-6" />
-            Configurações da Empresa
-          </h3>
-        </div>
-        <div className="p-6 flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-4">
-              <MapPin className="text-outline mt-1 shrink-0" />
-              <div>
-                <label className="text-label-sm text-on-surface block mb-1">EXIGIR LOCALIZAÇÃO (GPS)</label>
-                <span className="text-body-md text-on-surface-variant text-sm">Coletar coordenadas ao bater ponto</span>
-              </div>
-            </div>
-            
-            <div className="relative inline-block w-12 align-middle select-none transition duration-200 ease-in ml-4">
-              <input 
-                type="checkbox" 
-                id="toggle1" 
-                className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 top-0 left-0 transition-transform duration-300 ease-in-out focus:outline-none" 
-                checked={requireLocation}
-                onChange={() => setRequireLocation(!requireLocation)}
-              />
-              <label htmlFor="toggle1" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer border transition-colors duration-300 ${requireLocation ? 'bg-primary border-primary' : 'bg-surface-variant border-outline-variant'}`}></label>
+              <label className="text-label-sm text-on-surface block mb-1 font-bold">CÁLCULO DO PREVISTO</label>
+              <p className="text-body-sm text-on-surface-variant">O sistema considera o previsto apenas para os dias em que houve registro de ponto.</p>
             </div>
           </div>
         </div>

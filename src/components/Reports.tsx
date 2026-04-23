@@ -10,25 +10,13 @@ export function Reports() {
     totalExpectedMins, 
     totalWorkedMins, 
     balanceMins, 
-    chartData,
-    businessDaysElapsed
+    chartData
   } = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    // Calcular dias úteis transcorridos no mês atual até hoje
-    let businessDays = 0;
-    const todayNum = now.getDate();
-    for (let d = 1; d <= todayNum; d++) {
-        const date = new Date(currentYear, currentMonth, d);
-        const dayOfWeek = date.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) businessDays++;
-    }
-
-    const expectedTotal = expectedMinutes * businessDays;
-
-    // Isolar os registros do mês vigente
+    // Isolar os registros do mês vigente e agrupar por dia
     const monthPunches = punches.filter(p => p.timestamp.getMonth() === currentMonth && p.timestamp.getFullYear() === currentYear);
     const groupsByDay: Record<string, typeof punches> = {};
     monthPunches.forEach(p => {
@@ -37,14 +25,22 @@ export function Reports() {
       groupsByDay[dateKey].push(p);
     });
 
+    // Calcular trabalhado e dias ativos
     let workedTotal = 0;
+    let activeDays = 0;
+
     Object.keys(groupsByDay).forEach(dateKey => {
        const dayPunches = groupsByDay[dateKey].sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
        const isToday = dateKey === now.toLocaleDateString('en-CA');
        const targetNowMs = isToday ? now.getTime() : dayPunches[dayPunches.length-1].timestamp.getTime();
        const ms = calculateWorkedMs(dayPunches, targetNowMs);
-       workedTotal += Math.floor(ms / 60000);
+       
+       const mins = Math.floor(ms / 60000);
+       workedTotal += mins;
+       if (mins > 0) activeDays++;
     });
+
+    const expectedTotal = expectedMinutes * activeDays;
 
     // Gerar gráfico real com os últimos 14 dias
     const last14Days = Array.from({ length: 14 }).map((_, i) => {
@@ -55,14 +51,18 @@ export function Reports() {
 
     const cData = last14Days.map(date => {
       const dateKey = date.toLocaleDateString('en-CA');
-      const dayPunches = groupsByDay[dateKey] || [];
+      
+      // Procura punches independentemente se são do mês atual ou anterior
+      const dayPunches = punches.filter(p => p.timestamp.toLocaleDateString('en-CA') === dateKey).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
       const isToday = dateKey === now.toLocaleDateString('en-CA');
       const targetNowMs = isToday ? now.getTime() : (dayPunches.length ? dayPunches[dayPunches.length-1].timestamp.getTime() : 0);
       const ms = calculateWorkedMs(dayPunches, targetNowMs);
       const mins = Math.floor(ms / 60000);
       
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      const ideal = isWeekend ? 0 : expectedMinutes;
+      // Previsto para o dia: se houve ponto, conta como dia ativo
+      const ideal = mins > 0 ? expectedMinutes : 0;
+      
       let dateLabel = date.toLocaleDateString('pt-BR', { weekday: 'short' }).toUpperCase().replace('.', '');
       return { val: mins, ideal, dateLabel };
     });
@@ -71,8 +71,7 @@ export function Reports() {
       totalExpectedMins: expectedTotal,
       totalWorkedMins: workedTotal,
       balanceMins: workedTotal - expectedTotal,
-      chartData: cData,
-      businessDaysElapsed: businessDays
+      chartData: cData
     };
   }, [punches, expectedMinutes]);
   
@@ -139,50 +138,6 @@ export function Reports() {
           </div>
         </div>
       </div>
-
-      <section className="glass-panel rounded-xl overflow-hidden mt-2">
-        <div className="px-6 py-5 border-b border-outline-variant bg-surface-variant/30 flex justify-between items-center">
-          <h3 className="text-headline-md text-on-surface flex items-center gap-2">
-            <Calendar className="text-primary w-6 h-6" />
-            Resumo do Período
-          </h3>
-          <span className="text-primary text-label-sm font-bold flex items-center">
-            {monthName}
-          </span>
-        </div>
-        <div className="flex flex-col">
-          <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 hover:bg-surface-variant/20 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5 text-on-surface-variant" />
-              </div>
-              <div>
-                <p className="text-body-lg font-bold text-on-surface">Estimativa Esperada</p>
-                <p className="text-body-sm text-on-surface-variant">Base contratual ({businessDaysElapsed} dias úteis até hoje)</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-headline-sm font-bold text-on-surface">{expectedFmt}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-6 border-b border-outline-variant/30 hover:bg-surface-variant/20 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-body-lg font-bold text-on-surface">Horas Trabalhadas</p>
-                <p className="text-body-sm text-on-surface-variant">Líquidas computadas</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-headline-sm font-bold text-primary">{workedFmt}</p>
-            </div>
-          </div>
-
-        </div>
-      </section>
     </div>
   );
 }
