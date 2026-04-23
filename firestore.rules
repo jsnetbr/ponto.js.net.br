@@ -1,9 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
@@ -11,78 +8,95 @@ service cloud.firestore {
 
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-    
-    // In dev environment some Google sign-ins can occasionally have email_verified missing or false, 
-    // but the prompt mandates: "you MUST strictly mandate that the user is verified using request.auth.token.email_verified == true"
-    function isSignedIn() { return request.auth != null && request.auth.token.email_verified == true; }
-    
+
+    function isSignedIn() {
+      return request.auth != null &&
+             request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
 
-    function isValidUserCreate(data) {
-      return data.keys().hasAll(['email', 'createdAt'])
-        && data.keys().size() == 2
-        && data.email is string
-        && data.email.size() <= 200
-        && data.createdAt == request.time;
+    function isValidEmail(email) {
+      return email is string && email.size() > 0 && email.size() <= 200;
+    }
+
+    function isValidUserCreate(data, userId) {
+      return data.keys().hasOnly(['email', 'createdAt']) &&
+             isValidEmail(data.email) &&
+             data.createdAt == request.time &&
+             isValidId(userId);
+    }
+
+    function isValidExpectedMinutes(value) {
+      return value is int && value >= 1 && value <= 1440;
+    }
+
+    function isValidUserSettings(data, userId) {
+      return data.keys().hasOnly(['userId', 'expectedMinutes', 'requireLocation', 'updatedAt']) &&
+             data.userId == userId &&
+             isValidExpectedMinutes(data.expectedMinutes) &&
+             data.requireLocation is bool &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidPunchType(value) {
+      return value is string && value in ['in', 'out'];
+    }
+
+    function isValidPunch(data, userId) {
+      return data.keys().hasOnly(['userId', 'timestamp', 'type']) &&
+             data.userId == userId &&
+             data.timestamp is timestamp &&
+             isValidPunchType(data.type);
     }
 
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
-      allow list: if false; 
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserCreate(incoming());
-      allow update: if false; // Immutable profile
+      allow list: if false;
+      allow create: if isOwner(userId) && isValidUserCreate(incoming(), userId);
+      allow update: if false;
       allow delete: if false;
-    }
-
-    function isValidUserSettingsCreate(data) {
-       return data.keys().hasAll(['userId', 'expectedMinutes', 'requireLocation', 'updatedAt'])
-        && data.keys().size() == 4
-        && data.userId == request.auth.uid
-        && data.expectedMinutes is number
-        && data.expectedMinutes >= 0 && data.expectedMinutes <= 1440
-        && data.requireLocation is bool
-        && data.updatedAt == request.time;
-    }
-
-    function isValidUserSettingsUpdate(data) {
-       return data.expectedMinutes is number
-        && data.expectedMinutes >= 0 && data.expectedMinutes <= 1440
-        && data.requireLocation is bool
-        && data.updatedAt == request.time;
     }
 
     match /userSettings/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
-      allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserSettingsCreate(incoming());
-      allow update: if (
-        isOwner(userId) && isValidId(userId) && 
-        isValidUserSettingsUpdate(incoming()) &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['expectedMinutes', 'requireLocation', 'updatedAt'])
-      );
-    }
-
-    function isValidPunchCreate(data) {
-      return data.keys().hasAll(['userId', 'timestamp', 'type'])
-        && data.keys().size() == 3
-        && data.userId == request.auth.uid
-        && data.timestamp is timestamp
-        && data.type is string
-        && data.type.size() <= 3
-        && data.type in ['in', 'out'];
+      allow list: if isOwner(userId) &&
+                  isValidId(userId) &&
+                  resource.data.userId == request.auth.uid;
+      allow create: if isOwner(userId) &&
+                    isValidId(userId) &&
+                    isValidUserSettings(incoming(), userId);
+      allow update: if isOwner(userId) &&
+                    isValidId(userId) &&
+                    isValidUserSettings(incoming(), userId) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['expectedMinutes', 'requireLocation', 'updatedAt']);
+      allow delete: if false;
     }
 
     match /users/{userId}/punches/{punchId} {
-      allow get: if isOwner(userId) && isValidId(userId) && isValidId(punchId);
-      allow list: if isOwner(userId) && isValidId(userId) && resource.data.userId == request.auth.uid; 
-      allow create: if isOwner(userId) && isValidId(userId) && isValidId(punchId) && isValidPunchCreate(incoming());
-      allow update: if (
-        isOwner(userId) && isValidId(userId) && isValidId(punchId) && 
-        isValidPunchCreate(incoming()) && 
-        incoming().userId == existing().userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['timestamp', 'type'])
-      );
-      allow delete: if isOwner(userId) && isValidId(userId) && isValidId(punchId);
+      allow get: if isOwner(userId) &&
+                 isValidId(userId) &&
+                 isValidId(punchId) &&
+                 resource.data.userId == request.auth.uid;
+      allow list: if isOwner(userId) &&
+                  isValidId(userId) &&
+                  resource.data.userId == request.auth.uid;
+      allow create: if isOwner(userId) &&
+                    isValidId(userId) &&
+                    isValidId(punchId) &&
+                    isValidPunch(incoming(), userId) &&
+                    incoming().timestamp == request.time;
+      allow update: if isOwner(userId) &&
+                    isValidId(userId) &&
+                    isValidId(punchId) &&
+                    isValidPunch(incoming(), userId) &&
+                    incoming().type == existing().type &&
+                    incoming().userId == existing().userId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['timestamp']);
+      allow delete: if isOwner(userId) &&
+                    isValidId(userId) &&
+                    isValidId(punchId) &&
+                    resource.data.userId == request.auth.uid;
     }
 
   }

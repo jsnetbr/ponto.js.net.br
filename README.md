@@ -1,20 +1,60 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ponto.js.net.br
 
-# Run and deploy your AI Studio app
+Aplicativo web de controle de ponto com React + Firebase (Auth Google + Firestore).
 
-This contains everything you need to run your app locally.
+## Requisitos
 
-View your app in AI Studio: https://ai.studio/apps/a52af630-04e9-42b1-af25-c25be7a2828d
+- Node.js 20+
+- Projeto Firebase configurado (Auth Google habilitado + Firestore)
+- Firebase CLI autenticado (`firebase login`)
 
-## Run Locally
+## Executar localmente
 
-**Prerequisites:**  Node.js
+1. Instalar dependencias:
+   ```bash
+   npm install
+   ```
+2. Iniciar app:
+   ```bash
+   npm run dev
+   ```
+3. Abrir no navegador:
+   - `http://localhost:3000`
 
+## Verificacao de qualidade
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Checagem de tipos da aplicacao:
+  ```bash
+  npm run typecheck
+  ```
+- Testes de regras do Firestore:
+  ```bash
+  npm run test:rules
+  ```
+- Build de producao:
+  ```bash
+  npm run build
+  ```
+
+## Deploy de regras e indices Firestore
+
+1. Confirmar projeto no arquivo `.firebaserc`.
+2. Publicar regras e indices:
+   ```bash
+   firebase deploy --only firestore:rules,firestore:indexes
+   ```
+
+## Estrutura de dados Firestore
+
+- `users/{userId}`
+  - `email` (string)
+  - `createdAt` (timestamp)
+- `userSettings/{userId}`
+  - `userId` (string)
+  - `expectedMinutes` (int entre 1 e 1440)
+  - `requireLocation` (boolean)
+  - `updatedAt` (timestamp)
+- `users/{userId}/punches/{punchId}`
+  - `userId` (string)
+  - `timestamp` (timestamp)
+  - `type` (`in` ou `out`)

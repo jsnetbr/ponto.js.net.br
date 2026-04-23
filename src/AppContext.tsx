@@ -1,7 +1,26 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  type User,
+} from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { collection, query, orderBy, where, onSnapshot, addDoc, serverTimestamp, getDoc, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export interface Punch {
   id: string;
@@ -23,71 +42,119 @@ interface AppContextType {
   error: string | null;
 }
 
+const DEFAULT_EXPECTED_MINUTES = 528; // 8h48m
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const toUserMessage = (error: unknown, fallback: string): string => {
+  if (!(error instanceof FirebaseError)) {
+    return fallback;
+  }
+
+  switch (error.code) {
+    case 'permission-denied':
+      return 'Sem permissao para esta acao. Verifique o login e as regras.';
+    case 'resource-exhausted':
+      return 'Cota diaria do banco excedida.';
+    case 'unavailable':
+      return 'Servico indisponivel no momento. Tente novamente.';
+    case 'auth/popup-closed-by-user':
+      return 'Login cancelado antes de concluir.';
+    case 'auth/popup-blocked':
+      return 'Popup de login bloqueado pelo navegador.';
+    default:
+      return `${fallback} (${error.code})`;
+  }
+};
+
+const normalizeExpectedMinutes = (value: unknown): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const normalized = Math.round(value);
+  if (normalized < 1 || normalized > 1440) {
+    return null;
+  }
+
+  return normalized;
+};
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [punches, setPunches] = useState<Punch[]>([]);
-  const [expectedMinutes, setExpectedMinutes] = useState(528); // 8h48m default
+  const [expectedMinutes, setExpectedMinutes] = useState(DEFAULT_EXPECTED_MINUTES);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        if (!u.emailVerified) {
-          setError('Sua conta do Google precisa ter um e-mail verificado.');
+    const unsub = onAuthStateChanged(auth, async (nextUser) => {
+      try {
+        if (!nextUser) {
           setUser(null);
-        } else {
-          setUser(u);
-          // Check/create user profile
-          try {
-            const userRef = doc(db, 'users', u.uid);
-            const userSnap = await getDoc(userRef);
-            if (!userSnap.exists()) {
-               await setDoc(userRef, {
-                 email: u.email,
-                 createdAt: serverTimestamp()
-               });
-            }
-            
-            const settingsRef = doc(db, 'userSettings', u.uid);
-            const settingsSnap = await getDoc(settingsRef);
-            if (settingsSnap.exists()) {
-               const data = settingsSnap.data();
-               if (data.expectedMinutes !== undefined) {
-                 setExpectedMinutes(data.expectedMinutes);
-               } else if (data.expectedHours !== undefined) {
-                 // Migrate older decimal expectedHours to expectedMinutes
-                 const convertedMinutes = Math.round(data.expectedHours * 60);
-                 setExpectedMinutes(convertedMinutes);
-                 try {
-                   await updateDoc(settingsRef, {
-                     expectedMinutes: convertedMinutes,
-                     updatedAt: serverTimestamp()
-                   });
-                 } catch (e) {
-                   console.error("Failed to migrate expectedHours to expectedMinutes", e);
-                 }
-               }
-            } else {
-               await setDoc(settingsRef, {
-                 userId: u.uid,
-                 expectedMinutes: 528, // 8:48 hours Default
-                 requireLocation: true,
-                 updatedAt: serverTimestamp()
-               });
-               setExpectedMinutes(528);
-            }
-          } catch (err: any) {
-             console.error("Profile check fail", err);
-          }
+          setPunches([]);
+          return;
         }
-      } else {
-        setUser(null);
+
+        if (!nextUser.emailVerified) {
+          setUser(null);
+          setPunches([]);
+          setError('Sua conta Google precisa ter e-mail verificado.');
+          await signOut(auth);
+          return;
+        }
+
+        if (!nextUser.email) {
+          setUser(null);
+          setPunches([]);
+          setError('Nao foi possivel obter o e-mail da conta Google.');
+          await signOut(auth);
+          return;
+        }
+
+        setError(null);
+        setUser(nextUser);
+
+        const userRef = doc(db, 'users', nextUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            email: nextUser.email,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        const settingsRef = doc(db, 'userSettings', nextUser.uid);
+        const settingsSnap = await getDoc(settingsRef);
+        if (!settingsSnap.exists()) {
+          await setDoc(settingsRef, {
+            userId: nextUser.uid,
+            expectedMinutes: DEFAULT_EXPECTED_MINUTES,
+            requireLocation: true,
+            updatedAt: serverTimestamp(),
+          });
+          setExpectedMinutes(DEFAULT_EXPECTED_MINUTES);
+          return;
+        }
+
+        const settingsData = settingsSnap.data();
+        const normalizedExpected = normalizeExpectedMinutes(settingsData.expectedMinutes);
+        if (normalizedExpected == null) {
+          await updateDoc(settingsRef, {
+            expectedMinutes: DEFAULT_EXPECTED_MINUTES,
+            updatedAt: serverTimestamp(),
+          });
+          setExpectedMinutes(DEFAULT_EXPECTED_MINUTES);
+        } else {
+          setExpectedMinutes(normalizedExpected);
+        }
+      } catch (authSetupError) {
+        console.error('Failed during auth bootstrap', authSetupError);
+        setError(toUserMessage(authSetupError, 'Falha ao carregar sua conta.'));
+      } finally {
+        setLoadingAuth(false);
       }
-      setLoadingAuth(false);
     });
+
     return unsub;
   }, []);
 
@@ -96,32 +163,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPunches([]);
       return;
     }
-    const q = query(
-      collection(db, `users/${user.uid}/punches`), 
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'asc')
+
+    const punchesQuery = query(
+      collection(db, `users/${user.uid}/punches`),
+      orderBy('timestamp', 'asc'),
     );
-    const unsub = onSnapshot(q, (snapshot) => {
-      const p: Punch[] = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.timestamp) {
-          p.push({
-            id: doc.id,
+
+    const unsub = onSnapshot(
+      punchesQuery,
+      (snapshot) => {
+        const nextPunches: Punch[] = [];
+        snapshot.forEach((snapshotDoc) => {
+          const data = snapshotDoc.data();
+          if (!data.timestamp || typeof data.timestamp.toDate !== 'function') {
+            return;
+          }
+
+          if (data.type !== 'in' && data.type !== 'out') {
+            return;
+          }
+
+          nextPunches.push({
+            id: snapshotDoc.id,
             timestamp: data.timestamp.toDate(),
-            type: data.type
+            type: data.type,
           });
-        }
-      });
-      setPunches(p);
-    }, (err) => {
-       console.error("Error fetching punches", err);
-       if (err.message.includes('offline')) {
-          setError("Conexão offline.");
-       } else if (err.message.includes('Quota exceeded')) {
-          setError("Cota do banco de dados excedida por hoje.");
-       }
-    });
+        });
+        setPunches(nextPunches);
+      },
+      (snapshotError) => {
+        console.error('Error fetching punches', snapshotError);
+        setError(toUserMessage(snapshotError, 'Erro ao carregar historico de pontos.'));
+      },
+    );
+
     return unsub;
   }, [user]);
 
@@ -130,22 +205,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (signInError) {
+      setError(toUserMessage(signInError, 'Erro ao autenticar com Google.'));
     }
   };
 
   const logOut = async () => {
-    setPunches([]);
     setError(null);
-    await signOut(auth);
+    setPunches([]);
+    try {
+      await signOut(auth);
+    } catch (signOutError) {
+      setError(toUserMessage(signOutError, 'Erro ao sair da conta.'));
+    }
   };
 
   const addPunch = async () => {
-    if (!user) return;
-    
+    if (!user) {
+      return;
+    }
+
     setError(null);
-    
+
     if (punches.length > 0) {
       const lastPunch = punches[punches.length - 1];
       if (Date.now() - lastPunch.timestamp.getTime() < 15000) {
@@ -155,75 +236,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const type = punches.length % 2 === 0 ? 'in' : 'out';
-      // Permite bater o ponto com o timestamp do cliente para consistência caso haja edição futura
+      const type: 'in' | 'out' = punches.length % 2 === 0 ? 'in' : 'out';
       await addDoc(collection(db, `users/${user.uid}/punches`), {
         userId: user.uid,
-        timestamp: new Date(),
-        type
+        timestamp: serverTimestamp(),
+        type,
       });
-    } catch (e: any) {
-      console.error(e);
-      if (e.message.includes('Quota exceeded')) {
-         setError("Cota do banco de dados excedida por hoje.");
-      } else {
-         setError("Erro ao bater ponto de acesso: " + e.message);
-      }
+    } catch (addError) {
+      console.error('Failed to add punch', addError);
+      setError(toUserMessage(addError, 'Erro ao registrar ponto.'));
     }
   };
 
   const updatePunch = async (id: string, newTimestamp: Date) => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
+
+    if (!(newTimestamp instanceof Date) || Number.isNaN(newTimestamp.getTime())) {
+      setError('Horario invalido para atualizar ponto.');
+      return;
+    }
+
     try {
       await updateDoc(doc(db, `users/${user.uid}/punches`, id), {
-        timestamp: newTimestamp
+        timestamp: newTimestamp,
       });
-    } catch (e: any) {
-      console.error(e);
-      setError("Erro ao atualizar o ponto: " + e.message);
+    } catch (updateError) {
+      console.error('Failed to update punch', updateError);
+      setError(toUserMessage(updateError, 'Erro ao atualizar ponto.'));
     }
   };
 
   const deletePunch = async (id: string) => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, `users/${user.uid}/punches`, id));
-    } catch (e: any) {
-      console.error(e);
-      setError("Erro ao deletar o ponto: " + e.message);
+    } catch (deleteError) {
+      console.error('Failed to delete punch', deleteError);
+      setError(toUserMessage(deleteError, 'Erro ao excluir ponto.'));
     }
   };
 
-  const updateExpectedMinutes = async (m: number) => {
-    if (m < 1 || m > 1440) return; // limit to 24h, deny 0
-    setExpectedMinutes(m);
-    if (user) {
-      try {
-        await updateDoc(doc(db, 'userSettings', user.uid), {
-          expectedMinutes: m,
-          updatedAt: serverTimestamp()
-        });
-      } catch (e: any) {
-        console.error(e);
-        setError("Erro ao salvar jornada diária: " + e.message);
-      }
+  const updateExpectedMinutes = async (value: number) => {
+    const normalized = normalizeExpectedMinutes(value);
+    if (normalized == null) {
+      setError('Jornada diaria invalida. Informe entre 1 e 1440 minutos.');
+      return;
+    }
+
+    setExpectedMinutes(normalized);
+    if (!user) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'userSettings', user.uid), {
+        expectedMinutes: normalized,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (settingsError) {
+      console.error('Failed to update expected minutes', settingsError);
+      setError(toUserMessage(settingsError, 'Erro ao salvar jornada diaria.'));
     }
   };
 
   return (
-    <AppContext.Provider 
-      value={{ 
+    <AppContext.Provider
+      value={{
         user,
         loadingAuth,
         signIn,
         logOut,
-        punches, 
-        addPunch, 
+        punches,
+        addPunch,
         updatePunch,
         deletePunch,
-        expectedMinutes, 
+        expectedMinutes,
         updateExpectedMinutes,
-        error
+        error,
       }}
     >
       {children}
@@ -233,7 +327,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useAppContext deve ser usado dentro de AppProvider');
+  if (!context) {
+    throw new Error('useAppContext deve ser usado dentro de AppProvider');
+  }
   return context;
 };
-
