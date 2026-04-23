@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", Arial, sans-serif;
+
+  --color-primary: #0F172A;
+  --color-secondary: #64748B;
+  --color-tertiary: #94A3B8;
+  --color-primary-container: #1E293B;
+  --color-secondary-container: #E2E8F0;
+  --color-tertiary-container: #F1F5F9;
+  
+  --color-surface: #FFFFFF;
+  --color-surface-dim: #F8FAFC;
+  --color-surface-bright: #FFFFFF;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #F8FAFC;
+  --color-surface-container: #F1F5F9;
+  --color-surface-container-high: #E2E8F0;
+  --color-surface-container-highest: #CBD5E1;
+  --color-surface-variant: #F1F5F9;
+  
+  --color-on-surface: #1E293B;
+  --color-on-surface-variant: #64748B;
+  --color-outline: #E2E8F0;
+  --color-outline-variant: #F1F5F9;
+  
+  --color-error: #EF4444;
+  --color-error-container: #FEE2E2;
+  --color-on-error: #FFFFFF;
+}
+
+@layer utilities {
+  .text-display-lg {
+    font-size: 48px;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+  }
+  
+  .text-headline-md {
+    font-size: 24px;
+    line-height: 1.3;
+    font-weight: 700;
+  }
+  
+  .text-body-lg {
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  
+  .text-body-md {
+    font-size: 16px;
+    line-height: 1.6;
+    font-weight: 400;
+  }
+  
+  .text-label-sm {
+    font-size: 12px;
+    line-height: 1.2;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .glass-panel {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+
+  .glass-panel-elevated {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+  }
+
+  .app-bg {
+    background-color: #F8FAFC;
+    background-image: radial-gradient(circle at 100% 0%, #E0F2FE 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Custom toggle switches styling */
+  .toggle-checkbox:checked {
+    right: 0;
+    border-color: transparent;
+  }
+  .toggle-checkbox:checked + .toggle-label {
+    background-color: var(--color-primary);
+  }
+  .toggle-checkbox:checked + .toggle-label:after {
+    transform: translateX(100%);
+    border-color: transparent;
+  }
+}

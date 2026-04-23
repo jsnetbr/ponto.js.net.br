@@ -1,0 +1,18 @@
+{
+  "name": "ChronoFocus",
+  "short_name": "ChronoFocus",
+  "description": "App minimalista de rastreamento de foco e tempo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

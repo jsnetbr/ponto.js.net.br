@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with Personal Identifiable Information (PII).",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User email address."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of account creation."
+        }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User settings avoiding PII.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner ID."
+        },
+        "expectedMinutes": {
+          "type": "number",
+          "description": "Expected daily working minutes."
+        },
+        "requireLocation": {
+          "type": "boolean",
+          "description": "Boolean flag if location is required."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "When these settings were last modified."
+        }
+      },
+      "required": ["userId", "expectedMinutes", "requireLocation", "updatedAt"]
+    },
+    "Punch": {
+      "title": "Punch",
+      "description": "Time clock punch record.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner ID."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Date and time of the punch (server timestamp)."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["in", "out"],
+          "description": "Type of punch."
+        }
+      },
+      "required": ["userId", "timestamp", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Protected user profile containing PII."
+    },
+    "/userSettings/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "Application settings for the user."
+    },
+    "/users/{userId}/punches/{punchId}": {
+      "schema": { "$ref": "#/entities/Punch" },
+      "description": "Time punch records belonging to a user."
+    }
+  }
+}
