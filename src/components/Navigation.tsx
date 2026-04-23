@@ -25,7 +25,7 @@ export function Navigation({ activeTab, setActiveTab }: NavigationProps) {
       <header className="hidden md:flex justify-between items-center px-8 h-20 w-full fixed top-0 z-50 bg-surface/80 backdrop-blur-md border-b border-outline shadow-sm transition-all">
         <div className="flex items-center gap-4">
           <Clock className="text-primary w-6 h-6" />
-          <span className="font-extrabold text-2xl tracking-tighter text-on-surface">Ponto.</span>
+          <span className="font-extrabold text-2xl tracking-tighter text-on-surface">pontojs.</span>
         </div>
         
         <nav className="flex gap-8">

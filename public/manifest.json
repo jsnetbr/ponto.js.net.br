@@ -1,6 +1,6 @@
 {
-  "name": "ChronoFocus",
-  "short_name": "ChronoFocus",
+  "name": "pontojs",
+  "short_name": "pontojs",
   "description": "App minimalista de rastreamento de foco e tempo.",
   "start_url": "/",
   "display": "standalone",
