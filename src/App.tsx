@@ -6,7 +6,7 @@ import { History } from './components/History';
 import { Reports } from './components/Reports';
 import { Settings } from './components/Settings';
 import { AppProvider, useAppContext } from './AppContext';
-import { Fingerprint } from 'lucide-react';
+import { AppIcon } from './components/AppIcon';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,7 +24,7 @@ function AppContent() {
     return (
       <div className="flex flex-col h-screen w-full items-center justify-center bg-surface px-6 text-center">
         <div className="mb-8 p-6 bg-surface-variant rounded-full text-primary">
-          <Fingerprint size={64} />
+          <AppIcon size={64} />
         </div>
         <h1 className="text-display-lg text-on-surface mb-4">Ponto.</h1>
         <p className="text-body-lg text-on-surface-variant max-w-sm mb-12">
