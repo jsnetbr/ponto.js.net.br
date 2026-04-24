@@ -1,5 +1,5 @@
-import { Clock, Database, Download, LogOut, Building } from 'lucide-react';
-import React, { useState } from 'react';
+import { Clock, Database, Download, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 
 export function Settings() {
@@ -8,6 +8,11 @@ export function Settings() {
   // Local state for lazy update
   const [localHours, setLocalHours] = useState(Math.floor(expectedMinutes / 60));
   const [localMins, setLocalMins] = useState(expectedMinutes % 60);
+
+  useEffect(() => {
+    setLocalHours(Math.floor(expectedMinutes / 60));
+    setLocalMins(expectedMinutes % 60);
+  }, [expectedMinutes]);
 
   const handleSave = () => {
     updateExpectedMinutes((localHours * 60) + localMins);
@@ -99,12 +104,17 @@ export function Settings() {
           </h3>
         </div>
         <div className="p-6 flex flex-col gap-4">
-          <button className="w-full flex items-center justify-between bg-surface-variant hover:bg-outline-variant border border-outline-variant/50 rounded-lg px-5 py-3 transition-colors active:scale-[0.98]">
+          <button
+            type="button"
+            disabled
+            title="Exportação AFD ainda não está disponível."
+            className="w-full flex items-center justify-between bg-surface-variant border border-outline-variant/50 rounded-lg px-5 py-3 opacity-60 cursor-not-allowed"
+          >
             <div className="flex items-center gap-3">
               <Download className="text-on-surface w-5 h-5" />
               <span className="text-label-sm text-on-surface mt-0.5">EXPORTAR RELATÓRIO AFD (MTE)</span>
             </div>
-            <span className="text-on-surface-variant text-lg font-bold">›</span>
+            <span className="text-label-sm text-on-surface-variant">EM BREVE</span>
           </button>
           
           <button onClick={logOut} className="w-full flex items-center justify-between bg-surface-variant hover:bg-outline-variant border border-outline-variant/50 rounded-lg px-5 py-3 transition-colors active:scale-[0.98] mt-2">

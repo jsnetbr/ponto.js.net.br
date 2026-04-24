@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Navigation } from './components/Navigation';
-import { Dashboard } from './components/Dashboard';
-import { History } from './components/History';
-import { Reports } from './components/Reports';
-import { Settings } from './components/Settings';
 import { AppProvider, useAppContext } from './AppContext';
 import { AppIcon } from './components/AppIcon';
+
+const Dashboard = lazy(() => import('./components/Dashboard').then((module) => ({ default: module.Dashboard })));
+const History = lazy(() => import('./components/History').then((module) => ({ default: module.History })));
+const Reports = lazy(() => import('./components/Reports').then((module) => ({ default: module.Reports })));
+const Settings = lazy(() => import('./components/Settings').then((module) => ({ default: module.Settings })));
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -80,7 +81,15 @@ function AppContent() {
             transition={{ duration: 0.3 }}
             className="pb-24 md:pb-0"
           >
-            {renderContent()}
+            <Suspense
+              fallback={
+                <div className="flex min-h-[50vh] items-center justify-center">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }
+            >
+              {renderContent()}
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </main>

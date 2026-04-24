@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chronofocus-cache-v1';
+const CACHE_NAME = 'pontojs-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',

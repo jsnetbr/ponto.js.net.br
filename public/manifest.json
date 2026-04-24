@@ -1,7 +1,7 @@
 {
   "name": "pontojs",
   "short_name": "pontojs",
-  "description": "App minimalista de rastreamento de foco e tempo.",
+  "description": "Aplicativo web de controle de ponto e banco de horas.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F8FAFC",

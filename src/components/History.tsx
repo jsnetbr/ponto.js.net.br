@@ -1,11 +1,12 @@
-import { Calendar as CalendarIcon, Filter, CheckCircle2, AlertCircle, Trash2, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, CheckCircle2, AlertCircle, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
-import { formatMinutes, calculateWorkedMs } from '../utils';
+import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey, toMonthKey } from '../utils';
 
 export function History() {
   const { punches, expectedMinutes, updatePunch, deletePunch } = useAppContext();
   const [now, setNow] = useState(new Date());
+  const [selectedMonth, setSelectedMonth] = useState(toMonthKey(new Date()));
   
   const [editingPunch, setEditingPunch] = useState<{ id: string, dateObj: Date, timeStr: string } | null>(null);
   const [editTime, setEditTime] = useState('');
@@ -18,19 +19,21 @@ export function History() {
 
   // Agrupar batidas por dia (usando o fuso local dinâmico)
   const groups: Record<string, typeof punches> = {};
-  punches.forEach(p => {
-    const dateKey = p.timestamp.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const filteredPunches = punches.filter(p => toMonthKey(p.timestamp) === selectedMonth);
+
+  filteredPunches.forEach(p => {
+    const dateKey = toDateKey(p.timestamp);
     if (!groups[dateKey]) groups[dateKey] = [];
     groups[dateKey].push(p);
   });
 
-  const todayKey = now.toLocaleDateString('en-CA');
+  const todayKey = toDateKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = yesterday.toLocaleDateString('en-CA');
+  const yesterdayKey = toDateKey(yesterday);
 
   const daysData = Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(dateKey => {
-    const dayPunches = groups[dateKey].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const dayPunches = sortPunches(groups[dateKey]);
     
     const isToday = dateKey === todayKey;
     const targetNowMs = isToday ? now.getTime() : dayPunches[dayPunches.length - 1].timestamp.getTime();
@@ -39,11 +42,14 @@ export function History() {
     const totalMinutes = Math.floor(workedMs / 60000);
     const totalFmt = formatMinutes(totalMinutes);
 
-    const isWorking = dayPunches.length % 2 !== 0 && isToday;
+    const hasOpenPunch = dayPunches.length % 2 !== 0;
+    const isWorking = hasOpenPunch && isToday;
     
     let status = 'incomplete';
     if (isWorking) {
       status = 'working';
+    } else if (hasOpenPunch) {
+      status = 'open';
     } else if (totalMinutes >= expectedMinutes) {
       status = 'complete';
     }
@@ -77,14 +83,47 @@ export function History() {
 
     return {
       date: dateLabel,
+      dateKey,
+      hasOpenPunch,
       status,
       total: totalFmt,
+      balance: formatMinutes(totalMinutes - expectedMinutes, true),
       punches: uiPunches
     };
   });
 
-  const monthName = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const [selectedYear, selectedMonthNumber] = selectedMonth.split('-').map(Number);
+  const selectedMonthDate = new Date(selectedYear, selectedMonthNumber - 1, 1);
+  const monthName = selectedMonthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const currentMonthLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+  const handleExportCsv = () => {
+    const header = ['Data', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Total', 'Saldo', 'Observação'];
+    const rows = daysData.map((day) => {
+      const values = day.punches.slice(0, 4).map((p) => p.displayStr);
+      while (values.length < 4) values.push('--:--');
+
+      return [
+        day.dateKey,
+        ...values,
+        day.total,
+        day.balance,
+        day.hasOpenPunch ? 'Entrada sem saída' : '',
+      ];
+    });
+
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';'))
+      .join('\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ponto-${selectedMonth}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleOpenEdit = (punch: { id: string, dateObj: Date, displayStr: string }) => {
     setEditingPunch({ id: punch.id, dateObj: punch.dateObj, timeStr: punch.displayStr });
@@ -99,15 +138,19 @@ export function History() {
     const targetDate = new Date(editingPunch.dateObj);
     targetDate.setHours(hh, mm, 0, 0);
     
-    await updatePunch(editingPunch.id, targetDate);
-    setEditingPunch(null);
+    const saved = await updatePunch(editingPunch.id, targetDate);
+    if (saved) {
+      setEditingPunch(null);
+    }
   };
 
   const handleDelete = async () => {
     if (!editingPunch) return;
     if (window.confirm("Certeza que deseja excluir este ponto? Essa ação não pode ser desfeita.")) {
-      await deletePunch(editingPunch.id);
-      setEditingPunch(null);
+      const deleted = await deletePunch(editingPunch.id);
+      if (deleted) {
+        setEditingPunch(null);
+      }
     }
   };
 
@@ -120,15 +163,31 @@ export function History() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-xl p-2 flex items-center justify-between mb-8 shadow-sm">
+      <div className="glass-panel rounded-xl p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 shadow-sm">
         <div className="flex items-center gap-3 px-3">
           <CalendarIcon className="text-outline" size={20} />
           <span className="text-body-md text-on-surface font-medium capitalize">{currentMonthLabel}</span>
         </div>
-        <button className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-4 py-2 rounded-lg hover:bg-surface-variant">
-          <Filter size={18} />
-          <span className="text-label-sm hidden sm:inline">FILTRAR</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-on-surface-variant px-3 py-2 rounded-lg bg-surface">
+            <Filter size={18} />
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value || toMonthKey(now))}
+              className="bg-transparent text-body-sm text-on-surface outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={daysData.length === 0}
+            onClick={handleExportCsv}
+            className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-4 py-2 rounded-lg hover:bg-surface-variant disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={18} />
+            <span className="text-label-sm hidden sm:inline">CSV</span>
+          </button>
+        </div>
       </div>
 
       {daysData.length === 0 ? (
@@ -147,6 +206,7 @@ export function History() {
                 <div className="flex items-center gap-3">
                   {day.status === 'complete' && <CheckCircle2 className="text-emerald-500 w-5 h-5" title="Jornada Completa" />}
                   {day.status === 'incomplete' && <AlertCircle className="text-amber-500 w-5 h-5" title="Jornada Incompleta" />}
+                  {day.status === 'open' && <AlertCircle className="text-error w-5 h-5" title="Entrada sem saída" />}
                   {day.status === 'working' && <div className="w-3 h-3 rounded-full bg-primary animate-pulse ml-1 mr-1" title="Em andamento"></div>}
                   <span className="text-label-sm text-on-surface-variant tracking-wider font-bold">{day.date}</span>
                 </div>
@@ -176,14 +236,13 @@ export function History() {
                   );
                 })}
               </div>
+              {day.hasOpenPunch && (
+                <div className="mt-4 rounded-lg border border-error/30 bg-error-container/60 px-3 py-2 text-error text-body-sm font-semibold">
+                  Este dia tem uma entrada sem saída. Confira se faltou registrar ou editar alguma batida.
+                </div>
+              )}
             </div>
           ))}
-
-          <div className="flex justify-center mt-8">
-            <button className="glass-panel border border-outline hover:border-primary/50 text-on-surface-variant text-label-sm px-6 py-2.5 rounded-full hover:bg-surface-variant transition-colors shadow-sm">
-              VER ANTERIORES
-            </button>
-          </div>
         </div>
       )}
 

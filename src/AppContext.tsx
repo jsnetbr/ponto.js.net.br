@@ -21,6 +21,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { sortPunches, toDateKey, validateEditedPunchTime } from './utils';
 
 export interface Punch {
   id: string;
@@ -34,9 +35,11 @@ interface AppContextType {
   signIn: () => Promise<void>;
   logOut: () => Promise<void>;
   punches: Punch[];
-  addPunch: () => Promise<void>;
-  updatePunch: (id: string, newTimestamp: Date) => Promise<void>;
-  deletePunch: (id: string) => Promise<void>;
+  addPunch: () => Promise<boolean>;
+  updatePunch: (id: string, newTimestamp: Date) => Promise<boolean>;
+  deletePunch: (id: string) => Promise<boolean>;
+  isSavingPunch: boolean;
+  isOnline: boolean;
   expectedMinutes: number;
   updateExpectedMinutes: (v: number) => Promise<void>;
   error: string | null;
@@ -52,11 +55,11 @@ const toUserMessage = (error: unknown, fallback: string): string => {
 
   switch (error.code) {
     case 'permission-denied':
-      return 'Sem permissao para esta acao. Verifique o login e as regras.';
+      return 'Sem permissão para esta ação. Verifique o login e as regras.';
     case 'resource-exhausted':
-      return 'Cota diaria do banco excedida.';
+      return 'Cota diária do banco excedida.';
     case 'unavailable':
-      return 'Servico indisponivel no momento. Tente novamente.';
+      return 'Serviço indisponível no momento. Tente novamente.';
     case 'auth/popup-closed-by-user':
       return 'Login cancelado antes de concluir.';
     case 'auth/popup-blocked':
@@ -85,6 +88,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [punches, setPunches] = useState<Punch[]>([]);
   const [expectedMinutes, setExpectedMinutes] = useState(DEFAULT_EXPECTED_MINUTES);
   const [error, setError] = useState<string | null>(null);
+  const [isSavingPunch, setIsSavingPunch] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => (
+    typeof navigator === 'undefined' ? true : navigator.onLine
+  ));
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (nextUser) => {
@@ -106,7 +126,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!nextUser.email) {
           setUser(null);
           setPunches([]);
-          setError('Nao foi possivel obter o e-mail da conta Google.');
+          setError('Não foi possível obter o e-mail da conta Google.');
           await signOut(auth);
           return;
         }
@@ -193,7 +213,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       (snapshotError) => {
         console.error('Error fetching punches', snapshotError);
-        setError(toUserMessage(snapshotError, 'Erro ao carregar historico de pontos.'));
+        setError(toUserMessage(snapshotError, 'Erro ao carregar histórico de pontos.'));
       },
     );
 
@@ -220,71 +240,105 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addPunch = async () => {
+  const addPunch = async (): Promise<boolean> => {
     if (!user) {
-      return;
+      return false;
     }
 
     setError(null);
 
-    if (punches.length > 0) {
-      const lastPunch = punches[punches.length - 1];
+    if (!isOnline) {
+      setError('Sem internet no momento. Conecte-se antes de registrar o ponto.');
+      return false;
+    }
+
+    if (isSavingPunch) {
+      setError('Registro em andamento. Aguarde alguns segundos.');
+      return false;
+    }
+
+    const now = new Date();
+    const todayKey = toDateKey(now);
+    const todayPunches = sortPunches(punches.filter((punch) => toDateKey(punch.timestamp) === todayKey));
+
+    if (todayPunches.length > 0) {
+      const lastPunch = todayPunches[todayPunches.length - 1];
       if (Date.now() - lastPunch.timestamp.getTime() < 15000) {
         setError('Aguarde alguns segundos antes de registrar novamente.');
-        return;
+        return false;
       }
     }
 
     try {
-      const type: 'in' | 'out' = punches.length % 2 === 0 ? 'in' : 'out';
+      setIsSavingPunch(true);
+      const type: 'in' | 'out' = todayPunches.length % 2 === 0 ? 'in' : 'out';
       await addDoc(collection(db, `users/${user.uid}/punches`), {
         userId: user.uid,
         timestamp: serverTimestamp(),
         type,
       });
+      return true;
     } catch (addError) {
       console.error('Failed to add punch', addError);
       setError(toUserMessage(addError, 'Erro ao registrar ponto.'));
+      return false;
+    } finally {
+      setIsSavingPunch(false);
     }
   };
 
-  const updatePunch = async (id: string, newTimestamp: Date) => {
+  const updatePunch = async (id: string, newTimestamp: Date): Promise<boolean> => {
     if (!user) {
-      return;
+      return false;
     }
 
-    if (!(newTimestamp instanceof Date) || Number.isNaN(newTimestamp.getTime())) {
-      setError('Horario invalido para atualizar ponto.');
-      return;
+    if (!isOnline) {
+      setError('Sem internet no momento. Conecte-se antes de editar o ponto.');
+      return false;
+    }
+
+    const validationMessage = validateEditedPunchTime(punches, id, newTimestamp);
+    if (validationMessage) {
+      setError(validationMessage);
+      return false;
     }
 
     try {
       await updateDoc(doc(db, `users/${user.uid}/punches`, id), {
         timestamp: newTimestamp,
       });
+      return true;
     } catch (updateError) {
       console.error('Failed to update punch', updateError);
       setError(toUserMessage(updateError, 'Erro ao atualizar ponto.'));
+      return false;
     }
   };
 
-  const deletePunch = async (id: string) => {
+  const deletePunch = async (id: string): Promise<boolean> => {
     if (!user) {
-      return;
+      return false;
+    }
+
+    if (!isOnline) {
+      setError('Sem internet no momento. Conecte-se antes de excluir o ponto.');
+      return false;
     }
 
     try {
       await deleteDoc(doc(db, `users/${user.uid}/punches`, id));
+      return true;
     } catch (deleteError) {
       console.error('Failed to delete punch', deleteError);
       setError(toUserMessage(deleteError, 'Erro ao excluir ponto.'));
+      return false;
     }
   };
 
   const updateExpectedMinutes = async (value: number) => {
     const normalized = normalizeExpectedMinutes(value);
     if (normalized == null) {
-      setError('Jornada diaria invalida. Informe entre 1 e 1440 minutos.');
+      setError('Jornada diária inválida. Informe entre 1 e 1440 minutos.');
       return;
     }
 
@@ -300,7 +354,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (settingsError) {
       console.error('Failed to update expected minutes', settingsError);
-      setError(toUserMessage(settingsError, 'Erro ao salvar jornada diaria.'));
+      setError(toUserMessage(settingsError, 'Erro ao salvar jornada diária.'));
     }
   };
 
@@ -315,6 +369,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addPunch,
         updatePunch,
         deletePunch,
+        isSavingPunch,
+        isOnline,
         expectedMinutes,
         updateExpectedMinutes,
         error,

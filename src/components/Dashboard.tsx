@@ -1,10 +1,10 @@
-import { Fingerprint, LogIn, LogOut, Clock } from 'lucide-react';
+import { Fingerprint, LogIn, LogOut, Clock, WifiOff } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
-import { formatMinutes, calculateWorkedMs } from '../utils';
+import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey } from '../utils';
 
 export function Dashboard() {
-  const { punches, addPunch, expectedMinutes } = useAppContext();
+  const { punches, addPunch, expectedMinutes, isSavingPunch, isOnline } = useAppContext();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -12,8 +12,8 @@ export function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  const todayKey = now.toLocaleDateString('en-CA');
-  const todayPunches = punches.filter(p => p.timestamp.toLocaleDateString('en-CA') === todayKey);
+  const todayKey = toDateKey(now);
+  const todayPunches = sortPunches(punches.filter(p => toDateKey(p.timestamp) === todayKey));
 
   const isWorking = todayPunches.length % 2 !== 0;
 
@@ -27,6 +27,15 @@ export function Dashboard() {
 
   const remainingMinutes = Math.max(expectedMinutes - workedMinutes, 0);
   const balanceMinutes = workedMinutes - expectedMinutes;
+  const firstPunch = todayPunches[0];
+  const lunchStart = todayPunches[1];
+  const lunchEnd = todayPunches[2];
+  const finalExit = !isWorking && todayPunches.length >= 4 ? todayPunches[todayPunches.length - 1] : null;
+  const hasMissingExit = todayPunches.length % 2 !== 0;
+  const buttonLabel = isSavingPunch ? 'SALVANDO...' : (isWorking ? 'REGISTRAR SAÍDA' : 'BATER PONTO');
+  const formatTime = (date?: Date | null) => date
+    ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : '--:--';
 
   let predictedExitStr = '--:--';
   if (isWorking) {
@@ -57,14 +66,32 @@ export function Dashboard() {
       </div>
 
       {/* Main Punch Button */}
-      <div className="relative flex items-center justify-center mb-16 cursor-pointer group" onClick={addPunch}>
+      <button
+        type="button"
+        disabled={isSavingPunch || !isOnline}
+        className="relative flex items-center justify-center mb-16 cursor-pointer group disabled:cursor-not-allowed disabled:opacity-70"
+        onClick={addPunch}
+      >
         {isWorking && <div className="absolute inset-0 rounded-full border border-primary/20 animate-[ping_2.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>}
         
         <div className={`w-64 h-64 sm:w-72 sm:h-72 rounded-full flex flex-col items-center justify-center transition-all duration-500 ${isWorking ? 'bg-primary border border-primary text-white shadow-xl scale-[1.02]' : 'bg-surface border-2 border-outline hover:border-primary/50 text-on-surface hover:bg-surface-variant'}`}>
           <Fingerprint size={64} className="mb-4" />
-          <span className="text-label-sm tracking-widest">{isWorking ? 'REGISTRAR SAÍDA' : 'BATER PONTO'}</span>
+          <span className="text-label-sm tracking-widest">{buttonLabel}</span>
         </div>
-      </div>
+      </button>
+
+      {!isOnline && (
+        <div className="w-full mb-8 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-error flex items-center gap-3">
+          <WifiOff size={20} />
+          <span className="text-body-sm font-semibold">Sem internet. O ponto só pode ser registrado quando a conexão voltar.</span>
+        </div>
+      )}
+
+      {hasMissingExit && (
+        <div className="w-full mb-8 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-on-surface">
+          <span className="text-body-sm font-semibold">Você está com uma entrada aberta hoje.</span>
+        </div>
+      )}
 
       {/* Worked Hours Today & Extra Info */}
       <div className="w-full mb-8 border-b border-outline-variant pb-6">
@@ -93,6 +120,25 @@ export function Dashboard() {
               <span className="text-body-md font-semibold text-on-surface">{predictedExitStr}</span>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="glass-panel rounded-xl p-4">
+          <span className="text-label-sm text-on-surface-variant">ENTRADA</span>
+          <p className="text-headline-md text-on-surface">{formatTime(firstPunch?.timestamp)}</p>
+        </div>
+        <div className="glass-panel rounded-xl p-4">
+          <span className="text-label-sm text-on-surface-variant">ALMOÇO</span>
+          <p className="text-headline-md text-on-surface">{formatTime(lunchStart?.timestamp)} - {formatTime(lunchEnd?.timestamp)}</p>
+        </div>
+        <div className="glass-panel rounded-xl p-4">
+          <span className="text-label-sm text-on-surface-variant">SAÍDA</span>
+          <p className="text-headline-md text-on-surface">{formatTime(finalExit?.timestamp)}</p>
+        </div>
+        <div className="glass-panel rounded-xl p-4">
+          <span className="text-label-sm text-on-surface-variant">FALTAM</span>
+          <p className="text-headline-md text-on-surface">{isWorking ? formatMinutes(remainingMinutes) : '--:--'}</p>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "ponto-js-net-br",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,7 +10,7 @@
     "test:rules:runner": "vitest run firestore.rules.test.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "npm run typecheck"
   },
   "dependencies": {
