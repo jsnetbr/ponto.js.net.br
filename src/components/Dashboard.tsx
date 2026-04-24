@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
 import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey } from '../utils';
 
+const DEFAULT_PENDING_LUNCH_MINUTES = 60;
+
 export function Dashboard() {
   const { punches, addPunch, expectedMinutes, isSavingPunch, isOnline } = useAppContext();
   const [now, setNow] = useState(new Date());
@@ -27,6 +29,7 @@ export function Dashboard() {
 
   const remainingMinutes = Math.max(expectedMinutes - workedMinutes, 0);
   const balanceMinutes = workedMinutes - expectedMinutes;
+  const pendingLunchMinutes = isWorking && todayPunches.length === 1 ? DEFAULT_PENDING_LUNCH_MINUTES : 0;
   const firstPunch = todayPunches[0];
   const lunchStart = todayPunches[1];
   const lunchEnd = todayPunches[2];
@@ -39,7 +42,7 @@ export function Dashboard() {
 
   let predictedExitStr = '--:--';
   if (isWorking) {
-    const exitTime = new Date(now.getTime() + remainingMinutes * 60000);
+    const exitTime = new Date(now.getTime() + (remainingMinutes + pendingLunchMinutes) * 60000);
     predictedExitStr = exitTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
@@ -118,6 +121,11 @@ export function Dashboard() {
             <div className="flex flex-col">
               <span className="text-label-sm text-on-surface-variant">PREVISÃO DE SAÍDA</span>
               <span className="text-body-md font-semibold text-on-surface">{predictedExitStr}</span>
+              {pendingLunchMinutes > 0 && (
+                <span className="text-label-sm text-on-surface-variant">
+                  inclui {formatMinutes(pendingLunchMinutes)} de intervalo
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -138,7 +146,7 @@ export function Dashboard() {
         </div>
         <div className="glass-panel rounded-xl p-4">
           <span className="text-label-sm text-on-surface-variant">FALTAM</span>
-          <p className="text-headline-md text-on-surface">{isWorking ? formatMinutes(remainingMinutes) : '--:--'}</p>
+          <p className="text-headline-md text-on-surface">{isWorking ? formatMinutes(remainingMinutes + pendingLunchMinutes) : '--:--'}</p>
         </div>
       </div>
 
