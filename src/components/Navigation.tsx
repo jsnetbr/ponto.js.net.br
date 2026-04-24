@@ -1,11 +1,6 @@
-import { 
-    Clock, 
-    CalendarDays, 
-    LineChart, 
-    Settings2,
-    Fingerprint
-} from 'lucide-react';
+import { CalendarDays, LineChart, Settings2, Fingerprint } from 'lucide-react';
 import React from 'react';
+import { AppIcon } from './AppIcon';
 
 interface NavigationProps {
   activeTab: string;
@@ -24,7 +19,7 @@ export function Navigation({ activeTab, setActiveTab }: NavigationProps) {
     <>
       <header className="hidden md:flex justify-between items-center px-8 h-20 w-full fixed top-0 z-50 bg-surface/80 backdrop-blur-md border-b border-outline shadow-sm transition-all">
         <div className="flex items-center gap-4">
-          <Clock className="text-primary w-6 h-6" />
+          <AppIcon size={34} />
           <span className="font-extrabold text-2xl tracking-tighter text-on-surface">pontojs.</span>
         </div>
         
@@ -63,5 +58,3 @@ export function Navigation({ activeTab, setActiveTab }: NavigationProps) {
     </>
   );
 }
-
-

@@ -30,15 +30,8 @@ export function Dashboard() {
   const remainingMinutes = Math.max(expectedMinutes - workedMinutes, 0);
   const balanceMinutes = workedMinutes - expectedMinutes;
   const pendingLunchMinutes = isWorking && todayPunches.length === 1 ? DEFAULT_PENDING_LUNCH_MINUTES : 0;
-  const firstPunch = todayPunches[0];
-  const lunchStart = todayPunches[1];
-  const lunchEnd = todayPunches[2];
-  const finalExit = !isWorking && todayPunches.length >= 4 ? todayPunches[todayPunches.length - 1] : null;
   const hasMissingExit = todayPunches.length % 2 !== 0;
   const buttonLabel = isSavingPunch ? 'SALVANDO...' : (isWorking ? 'REGISTRAR SAÍDA' : 'BATER PONTO');
-  const formatTime = (date?: Date | null) => date
-    ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    : '--:--';
 
   let predictedExitStr = '--:--';
   if (isWorking) {
@@ -51,7 +44,7 @@ export function Dashboard() {
     if (index === 1) return 'Saída Almoço';
     if (index === 2) return 'Retorno Almoço';
     if (index === 3) return 'Saída';
-    return index % 2 === 0 ? `Entrada Extra ${Math.floor(index/2)}` : `Saída Extra ${Math.floor(index/2)}`;
+    return index % 2 === 0 ? `Entrada Extra ${Math.floor(index / 2)}` : `Saída Extra ${Math.floor(index / 2)}`;
   };
 
   const timeString = now.toLocaleTimeString('pt-BR', { hour12: false });
@@ -131,25 +124,6 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-        <div className="glass-panel rounded-xl p-4">
-          <span className="text-label-sm text-on-surface-variant">ENTRADA</span>
-          <p className="text-headline-md text-on-surface">{formatTime(firstPunch?.timestamp)}</p>
-        </div>
-        <div className="glass-panel rounded-xl p-4">
-          <span className="text-label-sm text-on-surface-variant">ALMOÇO</span>
-          <p className="text-headline-md text-on-surface">{formatTime(lunchStart?.timestamp)} - {formatTime(lunchEnd?.timestamp)}</p>
-        </div>
-        <div className="glass-panel rounded-xl p-4">
-          <span className="text-label-sm text-on-surface-variant">SAÍDA</span>
-          <p className="text-headline-md text-on-surface">{formatTime(finalExit?.timestamp)}</p>
-        </div>
-        <div className="glass-panel rounded-xl p-4">
-          <span className="text-label-sm text-on-surface-variant">FALTAM</span>
-          <p className="text-headline-md text-on-surface">{isWorking ? formatMinutes(remainingMinutes + pendingLunchMinutes) : '--:--'}</p>
-        </div>
-      </div>
-
       {/* Timeline of Punches */}
       <div className="w-full flex flex-col gap-3">
         {todayPunches.length === 0 && (
@@ -176,4 +150,3 @@ export function Dashboard() {
     </div>
   );
 }
-

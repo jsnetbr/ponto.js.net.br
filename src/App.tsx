@@ -24,8 +24,8 @@ function AppContent() {
   if (!user) {
     return (
       <div className="flex flex-col h-screen w-full items-center justify-center bg-surface px-6 text-center">
-        <div className="mb-8 p-6 bg-surface-variant rounded-full text-primary">
-          <AppIcon size={64} />
+        <div className="mb-8">
+          <AppIcon size={88} />
         </div>
         <h1 className="text-display-lg text-on-surface mb-4">pontojs.</h1>
         <p className="text-body-lg text-on-surface-variant max-w-sm mb-12">
@@ -104,4 +104,3 @@ export default function App() {
     </AppProvider>
   );
 }
-

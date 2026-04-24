@@ -1,5 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="128" fill="#0F172A"/>
-  <circle cx="256" cy="256" r="160" fill="none" stroke="#FFFFFF" stroke-width="48"/>
-  <path d="M256 160 L256 256 L330 330" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="pontojs">
+  <defs>
+    <linearGradient id="bg" x1="86" y1="46" x2="426" y2="466" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="142" y1="116" x2="386" y2="398" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A5B4FC"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="158" fill="#0F172A" stroke="#334155" stroke-width="18"/>
+  <path d="M256 98a158 158 0 0 1 137 79" fill="none" stroke="url(#accent)" stroke-width="22" stroke-linecap="round"/>
+  <path d="M256 138v118l72 72" fill="none" stroke="#F8FAFC" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M184 254c0-40 32-72 72-72s72 32 72 72" fill="none" stroke="#818CF8" stroke-width="18" stroke-linecap="round"/>
+  <path d="M214 254c0-23 19-42 42-42s42 19 42 42" fill="none" stroke="#CBD5E1" stroke-width="14" stroke-linecap="round"/>
+  <path d="M236 256c0-11 9-20 20-20s20 9 20 20c0 22-13 35-34 44" fill="none" stroke="#38BDF8" stroke-width="14" stroke-linecap="round"/>
+  <path d="M256 286c-13 14-30 24-52 31" fill="none" stroke="#CBD5E1" stroke-width="14" stroke-linecap="round"/>
+  <path d="M282 286c-7 24-24 43-53 58" fill="none" stroke="#818CF8" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="11" fill="#F8FAFC"/>
 </svg>
