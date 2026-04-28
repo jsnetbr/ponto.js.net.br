@@ -74,3 +74,8 @@ Aplicativo web de controle de ponto com React + Firebase (Auth Google + Firestor
   - `userId` (string)
   - `timestamp` (timestamp)
   - `type` (`in` ou `out`)
+
+
+## Próximos passos
+
+- Veja o roadmap técnico em `MELHORIAS.md` para evoluir robustez, testes, performance e operação.
