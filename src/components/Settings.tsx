@@ -14,8 +14,19 @@ export function Settings() {
     setLocalMins(expectedMinutes % 60);
   }, [expectedMinutes]);
 
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+  const parseNumber = (value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const handleSave = () => {
-    updateExpectedMinutes((localHours * 60) + localMins);
+    const nextHours = clamp(localHours, 0, 24);
+    const nextMinutes = clamp(localMins, 0, 59);
+    setLocalHours(nextHours);
+    setLocalMins(nextMinutes);
+    updateExpectedMinutes((nextHours * 60) + nextMinutes);
   };
 
   return (
@@ -64,7 +75,7 @@ export function Settings() {
                   type="number" 
                   min="0" max="24"
                   value={localHours} 
-                  onChange={(e) => setLocalHours(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setLocalHours(clamp(parseNumber(e.target.value), 0, 24))}
                   onBlur={handleSave}
                   className="w-full bg-surface-variant border border-outline-variant rounded-lg px-3 py-2 pr-6 text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-center" 
                 />
@@ -76,7 +87,7 @@ export function Settings() {
                   type="number" 
                   min="0" max="59"
                   value={localMins.toString().padStart(2, '0')} 
-                  onChange={(e) => setLocalMins(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setLocalMins(clamp(parseNumber(e.target.value), 0, 59))}
                   onBlur={handleSave}
                   className="w-full bg-surface-variant border border-outline-variant rounded-lg px-3 py-2 pr-7 text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-center" 
                 />

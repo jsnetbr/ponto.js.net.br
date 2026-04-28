@@ -40,6 +40,7 @@ interface AppContextType {
   deletePunch: (id: string) => Promise<boolean>;
   isSavingPunch: boolean;
   isOnline: boolean;
+  pendingPunchCount: number;
   expectedMinutes: number;
   updateExpectedMinutes: (v: number) => Promise<void>;
   error: string | null;
@@ -89,9 +90,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [expectedMinutes, setExpectedMinutes] = useState(DEFAULT_EXPECTED_MINUTES);
   const [error, setError] = useState<string | null>(null);
   const [isSavingPunch, setIsSavingPunch] = useState(false);
+  const [pendingPunchCount, setPendingPunchCount] = useState(0);
   const [isOnline, setIsOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
+
+  const getQueueStorageKey = (uid: string) => `pontojs:pendingPunches:${uid}`;
+
+  const readPendingQueue = (uid: string): number => {
+    if (typeof window === 'undefined') return 0;
+    try {
+      const raw = window.localStorage.getItem(getQueueStorageKey(uid));
+      const parsed = Number(raw ?? '0');
+      return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const writePendingQueue = (uid: string, value: number) => {
+    if (typeof window === 'undefined') return;
+    const normalized = Math.max(0, Math.floor(value));
+    if (normalized === 0) {
+      window.localStorage.removeItem(getQueueStorageKey(uid));
+      return;
+    }
+    window.localStorage.setItem(getQueueStorageKey(uid), String(normalized));
+  };
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -133,6 +158,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         setError(null);
         setUser(nextUser);
+        setPendingPunchCount(readPendingQueue(nextUser.uid));
 
         const userRef = doc(db, 'users', nextUser.uid);
         const userSnap = await getDoc(userRef);
@@ -247,11 +273,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setError(null);
 
-    if (!isOnline) {
-      setError('Sem internet no momento. Conecte-se antes de registrar o ponto.');
-      return false;
-    }
-
     if (isSavingPunch) {
       setError('Registro em andamento. Aguarde alguns segundos.');
       return false;
@@ -267,6 +288,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setError('Aguarde alguns segundos antes de registrar novamente.');
         return false;
       }
+    }
+
+    if (!isOnline) {
+      const queued = readPendingQueue(user.uid) + 1;
+      writePendingQueue(user.uid, queued);
+      setPendingPunchCount(queued);
+      setError(`Sem internet. Registramos ${queued} ponto(s) na fila local para sincronizar quando a conexão voltar.`);
+      return true;
     }
 
     try {
@@ -286,6 +315,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsSavingPunch(false);
     }
   };
+
+  useEffect(() => {
+    const flushPendingPunches = async () => {
+      if (!user || !isOnline || isSavingPunch) return;
+
+      const queued = readPendingQueue(user.uid);
+      if (queued <= 0) return;
+
+      setIsSavingPunch(true);
+      try {
+        for (let i = 0; i < queued; i += 1) {
+          const todayKey = toDateKey(new Date());
+          const todayCount = punches.filter((punch) => toDateKey(punch.timestamp) === todayKey).length + i;
+          const type: 'in' | 'out' = todayCount % 2 === 0 ? 'in' : 'out';
+          await addDoc(collection(db, `users/${user.uid}/punches`), {
+            userId: user.uid,
+            timestamp: serverTimestamp(),
+            type,
+          });
+        }
+        writePendingQueue(user.uid, 0);
+        setPendingPunchCount(0);
+        setError(`${queued} ponto(s) da fila local foram sincronizados com sucesso.`);
+      } catch (syncError) {
+        console.error('Failed to sync queued punches', syncError);
+        setError(toUserMessage(syncError, 'Falha ao sincronizar pontos em fila.'));
+      } finally {
+        setIsSavingPunch(false);
+      }
+    };
+
+    void flushPendingPunches();
+  }, [user, isOnline, punches, isSavingPunch]);
 
   const updatePunch = async (id: string, newTimestamp: Date): Promise<boolean> => {
     if (!user) {
@@ -371,6 +433,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deletePunch,
         isSavingPunch,
         isOnline,
+        pendingPunchCount,
         expectedMinutes,
         updateExpectedMinutes,
         error,
