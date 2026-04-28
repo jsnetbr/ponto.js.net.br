@@ -1,7 +1,7 @@
 import { Calendar as CalendarIcon, Download, Filter, CheckCircle2, AlertCircle, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
-import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey, toMonthKey } from '../utils';
+import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey, toMonthKey, validateEditedPunchTime } from '../utils';
 
 export function History() {
   const { punches, expectedMinutes, updatePunch, deletePunch } = useAppContext();
@@ -10,6 +10,15 @@ export function History() {
   
   const [editingPunch, setEditingPunch] = useState<{ id: string, dateObj: Date, timeStr: string } | null>(null);
   const [editTime, setEditTime] = useState('');
+
+  const editValidationMessage = (() => {
+    if (!editingPunch || !editTime) return null;
+    const [hh, mm] = editTime.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm)) return 'Informe um horário válido no formato HH:MM.';
+    const candidate = new Date(editingPunch.dateObj);
+    candidate.setHours(hh, mm, 0, 0);
+    return validateEditedPunchTime(punches, editingPunch.id, candidate);
+  })();
 
   useEffect(() => {
     // Atualiza a cada 1 minuto para o estado "trabalhando" renderizar corretamente os totais
@@ -137,6 +146,8 @@ export function History() {
     
     const targetDate = new Date(editingPunch.dateObj);
     targetDate.setHours(hh, mm, 0, 0);
+
+    if (editValidationMessage) return;
     
     const saved = await updatePunch(editingPunch.id, targetDate);
     if (saved) {
@@ -275,15 +286,20 @@ export function History() {
                 </button>
                 <button 
                   onClick={handleSaveEdit}
+                  disabled={Boolean(editValidationMessage)}
                   className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
                 >
                   SALVAR
                 </button>
              </div>
+             {editValidationMessage && (
+               <p className="mt-4 text-body-sm text-error font-semibold">
+                 {editValidationMessage}
+               </p>
+             )}
           </div>
         </div>
       )}
     </div>
   );
 }
-

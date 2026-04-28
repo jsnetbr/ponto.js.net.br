@@ -6,7 +6,7 @@ import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey } from '../uti
 const DEFAULT_PENDING_LUNCH_MINUTES = 60;
 
 export function Dashboard() {
-  const { punches, addPunch, expectedMinutes, isSavingPunch, isOnline } = useAppContext();
+  const { punches, addPunch, expectedMinutes, isSavingPunch, isOnline, pendingPunchCount } = useAppContext();
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export function Dashboard() {
       {/* Main Punch Button */}
       <button
         type="button"
-        disabled={isSavingPunch || !isOnline}
+        disabled={isSavingPunch}
         className="relative flex items-center justify-center mb-16 cursor-pointer group disabled:cursor-not-allowed disabled:opacity-70"
         onClick={addPunch}
       >
@@ -79,7 +79,17 @@ export function Dashboard() {
       {!isOnline && (
         <div className="w-full mb-8 rounded-xl border border-error/30 bg-error-container px-4 py-3 text-error flex items-center gap-3">
           <WifiOff size={20} />
-          <span className="text-body-sm font-semibold">Sem internet. O ponto só pode ser registrado quando a conexão voltar.</span>
+          <span className="text-body-sm font-semibold">
+            Sem internet. Novos pontos serão guardados localmente e enviados quando a conexão voltar.
+          </span>
+        </div>
+      )}
+
+      {pendingPunchCount > 0 && (
+        <div className="w-full mb-8 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-on-surface">
+          <span className="text-body-sm font-semibold">
+            {pendingPunchCount} ponto(s) aguardando sincronização.
+          </span>
         </div>
       )}
 
