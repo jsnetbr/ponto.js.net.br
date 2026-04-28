@@ -1,7 +1,7 @@
 import { Calendar as CalendarIcon, Download, Filter, CheckCircle2, AlertCircle, Trash2, X } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../AppContext';
-import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey, toMonthKey } from '../utils';
+import { formatMinutes, calculateWorkedMs, sortPunches, toDateKey, toMonthKey, validateEditedPunchTime } from '../utils';
 
 export function History() {
   const { punches, expectedMinutes, updatePunch, deletePunch } = useAppContext();
@@ -10,6 +10,28 @@ export function History() {
   
   const [editingPunch, setEditingPunch] = useState<{ id: string, dateObj: Date, timeStr: string } | null>(null);
   const [editTime, setEditTime] = useState('');
+
+  useEffect(() => {
+    if (!editingPunch) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setEditingPunch(null);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editingPunch]);
+
+  const editValidationMessage = (() => {
+    if (!editingPunch || !editTime) return null;
+    const [hh, mm] = editTime.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm)) return 'Informe um horário válido no formato HH:MM.';
+    const candidate = new Date(editingPunch.dateObj);
+    candidate.setHours(hh, mm, 0, 0);
+    return validateEditedPunchTime(punches, editingPunch.id, candidate);
+  })();
 
   useEffect(() => {
     // Atualiza a cada 1 minuto para o estado "trabalhando" renderizar corretamente os totais
@@ -137,6 +159,8 @@ export function History() {
     
     const targetDate = new Date(editingPunch.dateObj);
     targetDate.setHours(hh, mm, 0, 0);
+
+    if (editValidationMessage) return;
     
     const saved = await updatePunch(editingPunch.id, targetDate);
     if (saved) {
@@ -178,10 +202,11 @@ export function History() {
               className="bg-transparent text-body-sm text-on-surface outline-none"
             />
           </label>
-          <button
+              <button
             type="button"
             disabled={daysData.length === 0}
             onClick={handleExportCsv}
+            aria-label="Exportar histórico em CSV"
             className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-4 py-2 rounded-lg hover:bg-surface-variant disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={18} />
@@ -252,6 +277,7 @@ export function History() {
           <div className="glass-panel w-full max-w-sm rounded-2xl p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
              <button 
                onClick={() => setEditingPunch(null)}
+               aria-label="Fechar modal de edição"
                className="absolute top-4 right-4 text-outline hover:text-on-surface transition-colors"
              >
                <X size={20} />
@@ -269,21 +295,27 @@ export function History() {
              <div className="flex justify-between items-center gap-3">
                 <button 
                   onClick={handleDelete}
+                  aria-label="Excluir registro de ponto"
                   className="flex items-center justify-center gap-2 px-4 py-3 bg-error-container text-error rounded-xl hover:bg-error/20 transition-colors font-semibold"
                 >
                   <Trash2 size={20} />
                 </button>
                 <button 
                   onClick={handleSaveEdit}
-                  className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors"
+                  disabled={Boolean(editValidationMessage)}
+                  className="flex-1 bg-primary text-white py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   SALVAR
                 </button>
              </div>
+             {editValidationMessage && (
+               <p className="mt-4 text-body-sm text-error font-semibold">
+                 {editValidationMessage}
+               </p>
+             )}
           </div>
         </div>
       )}
     </div>
   );
 }
-
