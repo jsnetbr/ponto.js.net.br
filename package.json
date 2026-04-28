@@ -11,7 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
-    "lint": "npm run typecheck"
+    "lint": "npm run typecheck",
+    "test:unit": "vitest run src/utils.test.ts",
+    "test": "npm run lint && npm run test:unit && npm run build && npm run test:rules"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
